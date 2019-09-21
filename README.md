@@ -27,4 +27,5 @@ https://discord.gg/ZnFjnvE
 
 ## Are you happy with it ? Consider a donation =)
 https://paypal.me/pubgfb
+
 BTC : bc1qm9ta0rugnuaxzy3thjuaqsaknjgscs7sw29ut3
