@@ -24,3 +24,7 @@ You can find very well made tutos on YT : https://www.youtube.com/results?search
 
 ## How to contact me ?
 https://discord.gg/ZnFjnvE
+
+## Are you happy with it ? Consider a donation =)
+https://paypal.me/pubgfb
+BTC : bc1qm9ta0rugnuaxzy3thjuaqsaknjgscs7sw29ut3
