@@ -12,7 +12,7 @@ https://youtu.be/NpUA0E3mnnk
 https://www.thingiverse.com/thing:3870337
 
 ## BOM
-I'll do that later =)
+https://docs.google.com/spreadsheets/d/143vnWdcqSUWt8oRELgqYheUmmfsCHzCRaFdsLB4uqHM/edit?usp=sharing
 
 ## Drawings
 Please open the *.png file 
