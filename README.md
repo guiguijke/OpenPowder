@@ -5,6 +5,9 @@ An Arduino based high precision powder dispenser to reaload ammunitions
 Whilst I endeavour to keep the information up to date and correct, I make no representations or warranties of any kind, express or implied about the completeness, accuracy, reliability, suitability or availability with respect to the information, products, services or performance contained of the powder dosing for any purpose. Any reliance you place on such material is therefore strictly at your own risk.
 The use of this device to reload any kind of ammunition is your own responsability in case of any issue you could have with manually reloaded ammo's with my device.
 
+## Demo
+https://youtu.be/NpUA0E3mnnk
+
 ## 3D Parts to print
 https://www.thingiverse.com/thing:3870337
 
