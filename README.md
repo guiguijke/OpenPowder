@@ -16,6 +16,7 @@ https://docs.google.com/spreadsheets/d/143vnWdcqSUWt8oRELgqYheUmmfsCHzCRaFdsLB4u
 
 ## Drawings
 Please open the *.png file 
+++Small advice : you can use USB cable (the one you use to make a USB cable longer) to connect motor to stepper and HX711 to Arduino & power.
 
 ## Code
 The code used here is split in 2 because of my coding competences or hw limitations =)
