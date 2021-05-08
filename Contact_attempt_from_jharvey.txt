@@ -1,0 +1,12 @@
+I'm interested in your project, I've been thinking of doing similar. Can I email you to discuss? 
+I'm at mail@jaredharvey.com, I'm also on rusefi.slack.com as "kb1gtt"
+I'm not on discord, and would prefer to not create another account that I'm not going to use. 
+
+Are you still working on this dispensor? 
+
+I'm thinking the dispenser should have the abilithy to be attached to a progressive press, 
+and should have some automation features like a powder dispensed verification signal. 
+As well the initial powder drop tends to bounce out of the pan and make a mess of the bench
+I think the initial drop should be lower, perhaps it should get taller as it dispenses. 
+
+If you interested, please let me know. We can discusss design considerations. 
