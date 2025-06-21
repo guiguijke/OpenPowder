@@ -29,5 +29,3 @@ https://discord.gg/ZnFjnvE
 
 ## Are you happy with it ? Consider a donation =)
 https://paypal.me/pubgfb
-
-BTC : 12iN7apnrgmwMFh656WYrgL7S31XAeVEtC
