@@ -10,6 +10,7 @@
             "includePath": [
                 "C:/Users/guigu/OpenPowder/OpenPowder-1/include",
                 "C:/Users/guigu/OpenPowder/OpenPowder-1/src",
+                "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/EWMA",
                 "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/AccelStepper/src",
                 "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/HX711_ADC/src",
                 "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/LiquidCrystal",
@@ -28,6 +29,7 @@
                 "path": [
                     "C:/Users/guigu/OpenPowder/OpenPowder-1/include",
                     "C:/Users/guigu/OpenPowder/OpenPowder-1/src",
+                    "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/EWMA",
                     "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/AccelStepper/src",
                     "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/HX711_ADC/src",
                     "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/LiquidCrystal",
