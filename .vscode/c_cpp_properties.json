@@ -8,8 +8,12 @@
         {
             "name": "PlatformIO",
             "includePath": [
-                "C:/Users/guigu/OpenPowder/OpenPowder/Open Powder/include",
-                "C:/Users/guigu/OpenPowder/OpenPowder/Open Powder/src",
+                "C:/Users/guigu/OpenPowder/OpenPowder-1/include",
+                "C:/Users/guigu/OpenPowder/OpenPowder-1/src",
+                "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/AccelStepper/src",
+                "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/HX711_ADC/src",
+                "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/LiquidCrystal",
+                "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/Wire/src",
                 "C:/Users/guigu/.platformio/packages/framework-arduino-sam/cores/arduino",
                 "C:/Users/guigu/.platformio/packages/framework-arduino-sam/system/libsam",
                 "C:/Users/guigu/.platformio/packages/framework-arduino-sam/system/CMSIS/CMSIS/Include",
@@ -17,14 +21,17 @@
                 "C:/Users/guigu/.platformio/packages/framework-arduino-sam/variants/arduino_due_x",
                 "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/HID/src",
                 "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/SPI/src",
-                "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/Wire/src",
                 ""
             ],
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,
                 "path": [
-                    "C:/Users/guigu/OpenPowder/OpenPowder/Open Powder/include",
-                    "C:/Users/guigu/OpenPowder/OpenPowder/Open Powder/src",
+                    "C:/Users/guigu/OpenPowder/OpenPowder-1/include",
+                    "C:/Users/guigu/OpenPowder/OpenPowder-1/src",
+                    "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/AccelStepper/src",
+                    "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/HX711_ADC/src",
+                    "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/LiquidCrystal",
+                    "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/Wire/src",
                     "C:/Users/guigu/.platformio/packages/framework-arduino-sam/cores/arduino",
                     "C:/Users/guigu/.platformio/packages/framework-arduino-sam/system/libsam",
                     "C:/Users/guigu/.platformio/packages/framework-arduino-sam/system/CMSIS/CMSIS/Include",
@@ -32,7 +39,6 @@
                     "C:/Users/guigu/.platformio/packages/framework-arduino-sam/variants/arduino_due_x",
                     "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/HID/src",
                     "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/SPI/src",
-                    "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/Wire/src",
                     ""
                 ]
             },

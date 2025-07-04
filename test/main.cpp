@@ -1,9 +1,9 @@
-#include <Arduino.h>
+#include <Wire.h>
 #include <LiquidCrystal.h>
 #include <HX711_ADC.h>
 #include <AccelStepper.h>
 #include <Ewma.h>
-#include <PID_v1.h>
+
 
 void Update();
 void UpdateFast();
