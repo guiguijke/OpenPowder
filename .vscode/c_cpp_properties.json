@@ -1,0 +1,64 @@
+//
+// !!! WARNING !!! AUTO-GENERATED FILE!
+// PLEASE DO NOT MODIFY IT AND USE "platformio.ini":
+// https://docs.platformio.org/page/projectconf/section_env_build.html#build-flags
+//
+{
+    "configurations": [
+        {
+            "name": "PlatformIO",
+            "includePath": [
+                "C:/Users/guigu/OpenPowder/OpenPowder/Open Powder/include",
+                "C:/Users/guigu/OpenPowder/OpenPowder/Open Powder/src",
+                "C:/Users/guigu/.platformio/packages/framework-arduino-sam/cores/arduino",
+                "C:/Users/guigu/.platformio/packages/framework-arduino-sam/system/libsam",
+                "C:/Users/guigu/.platformio/packages/framework-arduino-sam/system/CMSIS/CMSIS/Include",
+                "C:/Users/guigu/.platformio/packages/framework-arduino-sam/system/CMSIS/Device/ATMEL",
+                "C:/Users/guigu/.platformio/packages/framework-arduino-sam/variants/arduino_due_x",
+                "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/HID/src",
+                "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/SPI/src",
+                "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/Wire/src",
+                ""
+            ],
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "path": [
+                    "C:/Users/guigu/OpenPowder/OpenPowder/Open Powder/include",
+                    "C:/Users/guigu/OpenPowder/OpenPowder/Open Powder/src",
+                    "C:/Users/guigu/.platformio/packages/framework-arduino-sam/cores/arduino",
+                    "C:/Users/guigu/.platformio/packages/framework-arduino-sam/system/libsam",
+                    "C:/Users/guigu/.platformio/packages/framework-arduino-sam/system/CMSIS/CMSIS/Include",
+                    "C:/Users/guigu/.platformio/packages/framework-arduino-sam/system/CMSIS/Device/ATMEL",
+                    "C:/Users/guigu/.platformio/packages/framework-arduino-sam/variants/arduino_due_x",
+                    "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/HID/src",
+                    "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/SPI/src",
+                    "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/Wire/src",
+                    ""
+                ]
+            },
+            "defines": [
+                "PLATFORMIO=60118",
+                "__SAM3X8E__",
+                "ARDUINO_SAM_DUE",
+                "ARDUINO=10805",
+                "F_CPU=84000000L",
+                "USBCON",
+                "USB_VID=0x2341",
+                "USB_PID=0x003E",
+                "USB_PRODUCT=\"Arduino Due\"",
+                "USB_MANUFACTURER=\"Arduino\"",
+                "ARDUINO_ARCH_SAM",
+                ""
+            ],
+            "cStandard": "gnu11",
+            "cppStandard": "gnu++11",
+            "compilerPath": "C:/Users/guigu/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc.exe",
+            "compilerArgs": [
+                "-mcpu=cortex-m3",
+                "-mthumb",
+                ""
+            ]
+        }
+    ],
+    "version": 4
+}
