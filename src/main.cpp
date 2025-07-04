@@ -104,7 +104,7 @@ void filters() {
   consigne = entierconsignebrut + decimalesconsignebrut;
 
   auto_mode = digitalRead(modeautopin);
-  int buttonstate = digitalRead(buttonPin);
+  
   buttonState1 = digitalRead(buttonPin1);
 
   if ((buttonState1 != lastReading) && (buttonState1 == HIGH)) {
