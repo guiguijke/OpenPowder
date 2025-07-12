@@ -1,28 +1,23 @@
 #include <Arduino.h>
-#include <LiquidCrystal.h>
+#include <LiquidCrystal_I2C.h>
 #include <HX711_ADC.h>
 #include <AccelStepper.h>
-#include <Ewma.h>
 
 void Update();
 void filters();
 void Process();
 void dataReadyISR();
 
-AccelStepper stepperX(1, 3, 4);
+AccelStepper stepperX(1, 3, 4); // Retour à l'original : Driver mode, STEP pin 3, DIR pin 4
 long max_speed = 1500;
 bool runallowed = false;
 
 HX711_ADC LoadCell(11, 12);
-LiquidCrystal lcd(46, 47, 48, 49, 50, 51);
-
-Ewma adcFilterA0(0.1);
-Ewma adcFilterA1(0.1);
-Ewma loadcellfilter(0.01);
+LiquidCrystal_I2C lcd(0x27, 16, 2);  // Adresse I2C courante 0x27, ajustez si nécessaire
 
 int step = 0;
 float consigne = 0.0;
-float i = 0.0; // Poids filtré
+float i = 0.0; // Poids brut
 unsigned long timer = 0;
 float low_speed = max_speed / 10;
 float very_low_speed = max_speed / 20;
@@ -38,37 +33,52 @@ unsigned long t, z;
 
 volatile boolean newDataReady = false;
 
+String current_status = "Init";
+
 void setup() {
   Serial.begin(115200);
+  Serial.println("Setup started");
+
   pinMode(buttonPin, INPUT);
   pinMode(buttonPin1, INPUT);
   pinMode(modeautopin, INPUT);
 
-  lcd.begin(20, 4);
+  lcd.init();
+  lcd.backlight();
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Connex / Stab / Tare");
+  lcd.print("Init / Tare");
+  Serial.println("LCD: Init / Tare displayed");
 
   float calValue = 36160;
   LoadCell.begin();
+  Serial.println("LoadCell.begin() done");
+
   long stabilisingtime = 2000;
   LoadCell.start(stabilisingtime);
   if (LoadCell.getTareTimeoutFlag()) {
     Serial.println("Tare timeout");
+    lcd.setCursor(0, 1);
+    lcd.print("Tare Timeout");
   } else {
     LoadCell.setCalFactor(calValue);
+    Serial.println("Calibration set");
   }
-  while (!LoadCell.update());
+
+  unsigned long startTime = millis();
+  while (!LoadCell.update() && millis() - startTime < 5000);  // Timeout après 5 secondes
+  if (millis() - startTime >= 5000) {
+    Serial.println("Timeout waiting for LoadCell update");
+    lcd.setCursor(0, 1);
+    lcd.print("LC Update TO");
+  } else {
+    Serial.println("LoadCell.update() successful");
+  }
 
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Step = ");
-  lcd.setCursor(0, 1);
-  lcd.print("Target g = ");
-  lcd.setCursor(0, 2);
-  lcd.print("Weight g = ");
-  lcd.setCursor(0, 3);
-  lcd.print("Spd = ");
+  lcd.print("Setup Done");
+  Serial.println("LCD cleared and Setup Done displayed");
 
   stepperX.setMaxSpeed(max_speed);
   stepperX.setSpeed(max_speed);
@@ -76,8 +86,13 @@ void setup() {
   stepperX.setEnablePin(2);
   stepperX.setPinsInverted(false, false, true);
   stepperX.enableOutputs();
+  Serial.println("AccelStepper initialized");
 
   attachInterrupt(digitalPinToInterrupt(11), dataReadyISR, FALLING);
+  Serial.println("Interrupt attached");
+
+  Serial.println("Setup completed");
+  z = millis();  // Initialiser z pour que Update commence immédiatement
 }
 
 void dataReadyISR() {
@@ -87,15 +102,18 @@ void dataReadyISR() {
 }
 
 void filters() {
-  float a0 = adcFilterA0.filter(analogRead(A0));
-  float a1 = adcFilterA1.filter(analogRead(A1));
+  // Pas de filtrage Ewma pour la consigne, on utilise brut
+  float a0 = analogRead(A0);
+  float a1 = analogRead(A1);
 
   if (newDataReady) {
     if (millis() > t) {
       float loadcelldata = LoadCell.getData();
-      i = loadcellfilter.filter(loadcelldata);
+      i = loadcelldata;  // Valeur brute sans filtre
       newDataReady = 0;
       t = millis();
+      Serial.print("Poids brut mesure: ");
+      Serial.println(i, 3);
     }
   }
 
@@ -104,48 +122,51 @@ void filters() {
   consigne = entierconsignebrut + decimalesconsignebrut;
 
   auto_mode = digitalRead(modeautopin);
-  
+  int buttonstate = digitalRead(buttonPin);
   buttonState1 = digitalRead(buttonPin1);
 
   if ((buttonState1 != lastReading) && (buttonState1 == HIGH)) {
+    Serial.println("Bouton TARE presse: Effectue tare, arret et reset");
     LoadCell.tare();
+    runallowed = false;
+    step = 0;
+    current_status = "Tare/Reset";
   }
   lastReading = buttonState1;
 }
 
 void Process() {
+  Serial.print("Etat actuel: ");
+  Serial.print(step);
+  Serial.print(" - ");
+  Serial.println(current_status);
+
   switch (step) {
     case 0: // Attente
-      lcd.setCursor(8, 0);
-      lcd.print("            ");
-      lcd.setCursor(8, 0);
-      lcd.print(auto_mode ? "Waiting A" : "Waiting");
+      current_status = auto_mode ? "WaitA" : "Wait";
       if ((digitalRead(buttonPin) == HIGH) || (auto_mode && i > -0.5)) {
         step = 1;
+        Serial.println("Demarrage du processus");
       }
       break;
 
     case 1: // Tarage
-      lcd.setCursor(8, 0);
-      lcd.print("            ");
-      lcd.setCursor(8, 0);
-      lcd.print("Taring");
+      current_status = "Tare";
       LoadCell.tare();
       timer = millis() + 2000;
       step = 2;
+      Serial.println("Tarage en cours");
       break;
 
     case 2: // Attente fin tarage
       if (LoadCell.getTareStatus() || millis() > timer) {
         step = 3;
+        Serial.println("Tarage termine");
       }
       break;
 
     case 3: // Dosage rapide
-      lcd.setCursor(8, 0);
-      lcd.print("            ");
-      lcd.setCursor(8, 0);
-      lcd.print("Fast Dispense");
+      current_status = "Fast";
       stepperX.setSpeed(max_speed);
       runallowed = true;
       if (i >= consigne * 0.9) {
@@ -154,10 +175,7 @@ void Process() {
       break;
 
     case 4: // Dosage lent
-      lcd.setCursor(8, 0);
-      lcd.print("            ");
-      lcd.setCursor(8, 0);
-      lcd.print("Slow Dispense");
+      current_status = "Slow";
       stepperX.setSpeed(low_speed);
       if (i >= consigne - 0.01) {
         step = 5;
@@ -165,26 +183,32 @@ void Process() {
       break;
 
     case 5: // Début stabilisation
+      current_status = "Stab";
       runallowed = false;
       timer = millis() + 500;
       step = 6;
+      Serial.println("Stabilisation commencee");
       break;
 
     case 6: // Attente stabilisation
       if (millis() > timer) {
         step = 7;
+        Serial.println("Stabilisation terminee, verification poids");
       }
       break;
 
     case 7: // Vérification poids
       if (i >= consigne - 0.005) {
         step = 0;
+        Serial.println("Poids atteint, retour a attente");
       } else {
         step = 8;
+        Serial.println("Ajout final necessaire");
       }
       break;
 
     case 8: // Début dernier ajout
+      current_status = "Drop";
       stepperX.setSpeed(very_low_speed);
       runallowed = true;
       timer = millis() + 20;
@@ -195,6 +219,7 @@ void Process() {
       if (millis() > timer) {
         runallowed = false;
         step = 5;
+        Serial.println("Dernier ajout termine, retour a stabilisation");
       }
       break;
   }
@@ -207,25 +232,32 @@ void loop() {
     stepperX.runSpeed();
   }
   Update();
+  // Log pour confirmer que la loop tourne
+  static unsigned long lastLoopLog = 0;
+  if (millis() - lastLoopLog > 1000) {
+    Serial.println("Loop is running");
+    lastLoopLog = millis();
+  }
 }
 
 void Update() {
   if (millis() > z + 200) {
-    lcd.setCursor(11, 2);
-    lcd.print("       ");
-    lcd.setCursor(11, 2);
-    lcd.print(i, 3);
+    lcd.setCursor(0, 0);
+    lcd.print("                ");  // Efface la ligne 0
+    lcd.setCursor(0, 0);
+    String stp_label = auto_mode ? "StpA:" : "Stp:";
+    lcd.print(stp_label + current_status + " Sp:" + String((int)(stepperX.speed() / max_speed * 100)) + "%");
 
-    lcd.setCursor(11, 1);
-    lcd.print("    ");
-    lcd.setCursor(11, 1);
-    lcd.print(consigne, 3);
+    lcd.setCursor(0, 1);
+    lcd.print("                ");  // Efface la ligne 1
+    lcd.setCursor(0, 1);
+    lcd.print("T:" + String(consigne, 3) + " W:" + String(i, 3));
 
-    lcd.setCursor(6, 3);
-    lcd.print("    ");
-    lcd.setCursor(6, 3);
-    lcd.print((float(stepperX.speed()) / max_speed * 100), 0);
-    lcd.print("%");
+    // Log pour affichage
+    Serial.print("Affichage mis a jour - Consigne: ");
+    Serial.print(consigne, 3);
+    Serial.print(" Poids: ");
+    Serial.println(i, 3);
 
     z = millis();
   }
