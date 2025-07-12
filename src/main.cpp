@@ -8,7 +8,7 @@ void filters();
 void Process();
 void dataReadyISR();
 
-AccelStepper stepperX(1, 3, 4); // Retour à l'original : Driver mode, STEP pin 3, DIR pin 4
+AccelStepper stepperX(1, 3, 4); // Driver mode, STEP pin 3, DIR pin 4
 long max_speed = 1500;
 bool runallowed = false;
 
@@ -30,6 +30,9 @@ boolean auto_mode = false;
 byte buttonState1 = 0;
 byte lastReading = 0;
 unsigned long t, z;
+unsigned long lastProcessLog = 0;
+unsigned long lastWeightLog = 0;
+unsigned long lastLoopLog = 0;
 
 volatile boolean newDataReady = false;
 
@@ -112,8 +115,11 @@ void filters() {
       i = loadcelldata;  // Valeur brute sans filtre
       newDataReady = 0;
       t = millis();
-      Serial.print("Poids brut mesure: ");
-      Serial.println(i, 3);
+      if (millis() > lastWeightLog + 1000) {  // Log poids toutes les 1s
+        Serial.print("Poids brut mesure: ");
+        Serial.println(i, 3);
+        lastWeightLog = millis();
+      }
     }
   }
 
@@ -136,10 +142,13 @@ void filters() {
 }
 
 void Process() {
-  Serial.print("Etat actuel: ");
-  Serial.print(step);
-  Serial.print(" - ");
-  Serial.println(current_status);
+  if (millis() > lastProcessLog + 500) {  // Log état toutes les 500ms
+    Serial.print("Etat actuel: ");
+    Serial.print(step);
+    Serial.print(" - ");
+    Serial.println(current_status);
+    lastProcessLog = millis();
+  }
 
   switch (step) {
     case 0: // Attente
@@ -229,12 +238,16 @@ void loop() {
   filters();
   Process();
   if (runallowed) {
+    stepperX.runSpeed();  // Appel principal
+    // Appels supplémentaires pour améliorer la fluidité si loop est lente
+    stepperX.runSpeed();
+    stepperX.runSpeed();
+    stepperX.runSpeed();
     stepperX.runSpeed();
   }
   Update();
-  // Log pour confirmer que la loop tourne
-  static unsigned long lastLoopLog = 0;
-  if (millis() - lastLoopLog > 1000) {
+  // Log pour confirmer que la loop tourne, toutes les 5s pour réduire
+  if (millis() > lastLoopLog + 5000) {
     Serial.println("Loop is running");
     lastLoopLog = millis();
   }
@@ -253,11 +266,15 @@ void Update() {
     lcd.setCursor(0, 1);
     lcd.print("T:" + String(consigne, 3) + " W:" + String(i, 3));
 
-    // Log pour affichage
-    Serial.print("Affichage mis a jour - Consigne: ");
-    Serial.print(consigne, 3);
-    Serial.print(" Poids: ");
-    Serial.println(i, 3);
+    // Log pour affichage, toutes les 1s au lieu de 200ms
+    static unsigned long lastUpdateLog = 0;
+    if (millis() > lastUpdateLog + 1000) {
+      Serial.print("Affichage mis a jour - Consigne: ");
+      Serial.print(consigne, 3);
+      Serial.print(" Poids: ");
+      Serial.println(i, 3);
+      lastUpdateLog = millis();
+    }
 
     z = millis();
   }
