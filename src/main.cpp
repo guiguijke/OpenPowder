@@ -1,14 +1,15 @@
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 #include <HX711_ADC.h>
-#include <AccelStepper.h>
+#include <FastAccelStepper.h>
 
 void Update();
 void filters();
 void Process();
 void dataReadyISR();
 
-AccelStepper stepperX(1, 3, 4); // Driver mode, STEP pin 3, DIR pin 4
+FastAccelStepperEngine engine;
+FastAccelStepper *stepperX;
 long max_speed = 1500;
 bool runallowed = false;
 
@@ -37,6 +38,18 @@ unsigned long lastLoopLog = 0;
 volatile boolean newDataReady = false;
 
 String current_status = "Init";
+
+// Nouvelles variables pour calibration
+float grams_per_step = 0.0001; // Valeur initiale par défaut (ajustez après tests)
+const int calib_steps = 200; // Nombre de steps pour calibration
+float initial_weight = 0.0;
+bool calibration_done = false;
+
+// Pour détection long press sur TARE
+boolean buttonActive = false;
+boolean longPressActive = false;
+unsigned long buttonTimer = 0;
+const unsigned long longPressTime = 1000; // 1 seconde pour long press
 
 void setup() {
   Serial.begin(115200);
@@ -83,13 +96,21 @@ void setup() {
   lcd.print("Setup Done");
   Serial.println("LCD cleared and Setup Done displayed");
 
-  stepperX.setMaxSpeed(max_speed);
-  stepperX.setSpeed(max_speed);
-  stepperX.setAcceleration(100.0);
-  stepperX.setEnablePin(2);
-  stepperX.setPinsInverted(false, false, true);
-  stepperX.enableOutputs();
-  Serial.println("AccelStepper initialized");
+  engine = FastAccelStepperEngine();
+  engine.init();
+  stepperX = engine.stepperConnectToPin(6);  // Pin STEP sur D6
+  if (stepperX == NULL) {
+    Serial.println("Error connecting stepper");
+    lcd.setCursor(0, 1);
+    lcd.print("Stepper Err");
+    while (1);
+  }
+  stepperX->setDirectionPin(4);
+  stepperX->setEnablePin(2, true); // low active
+  stepperX->setAutoEnable(true);
+  stepperX->setSpeedInHz(max_speed);
+  stepperX->setAcceleration(150000);  // Réduite à 500 pour plus de précision et moins d'overshoot
+  Serial.println("FastAccelStepper initialized on pin 6");
 
   attachInterrupt(digitalPinToInterrupt(11), dataReadyISR, FALLING);
   Serial.println("Interrupt attached");
@@ -128,16 +149,40 @@ void filters() {
   consigne = entierconsignebrut + decimalesconsignebrut;
 
   auto_mode = digitalRead(modeautopin);
-  int buttonstate = digitalRead(buttonPin);
   buttonState1 = digitalRead(buttonPin1);
 
-  if ((buttonState1 != lastReading) && (buttonState1 == HIGH)) {
-    Serial.println("Bouton TARE presse: Effectue tare, arret et reset");
-    LoadCell.tare();
-    runallowed = false;
-    step = 0;
-    current_status = "Tare/Reset";
+  // Détection long press pour TARE
+  if (buttonState1 == HIGH) {
+    if (buttonActive == false) {
+      buttonActive = true;
+      buttonTimer = millis();
+    }
+
+    if ((millis() - buttonTimer > longPressTime) && (longPressActive == false)) {
+      longPressActive = true;
+      Serial.println("Long press TARE détecté: Lance calibration standalone");
+      LoadCell.tare();  // Tare d'abord
+      step = 100;  // Nouvel état pour calibration standalone
+      current_status = "Calib";
+    }
+  } else {
+    if (buttonActive == true) {
+      if (longPressActive == true) {
+        longPressActive = false;
+      } else {
+        // Short press: Tare normal
+        Serial.println("Short press TARE: Tare, arrêt et reset");
+        LoadCell.tare();
+        runallowed = false;
+        stepperX->stopMove();
+        step = 0;
+        current_status = "Tare/Reset";
+        calibration_done = false;
+      }
+      buttonActive = false;
+    }
   }
+
   lastReading = buttonState1;
 }
 
@@ -152,7 +197,7 @@ void Process() {
 
   switch (step) {
     case 0: // Attente
-      current_status = auto_mode ? "WaitA" : "Wait";
+      current_status = "Wait" + String(auto_mode ? "A" : "");
       if ((digitalRead(buttonPin) == HIGH) || (auto_mode && i > -0.5)) {
         step = 1;
         Serial.println("Demarrage du processus");
@@ -169,66 +214,142 @@ void Process() {
 
     case 2: // Attente fin tarage
       if (LoadCell.getTareStatus() || millis() > timer) {
-        step = 3;
-        Serial.println("Tarage termine");
+        step = 4;  // Calibration est maintenant séparée, passer directement au dosage
+        Serial.println("Tarage termine, passage au dosage (calib séparée)");
       }
       break;
 
-    case 3: // Dosage rapide
+    case 4: { // Dosage rapide estimé jusqu'à 90% (réduit pour éviter overshoot)
       current_status = "Fast";
-      stepperX.setSpeed(max_speed);
-      runallowed = true;
-      if (i >= consigne * 0.9) {
-        step = 4;
+      float target_90 = consigne * 0.90;
+      float remaining_grams = target_90 - i;
+      long estimated_steps = (long)(remaining_grams / grams_per_step);
+      if (estimated_steps > 0) {
+        stepperX->setSpeedInHz(max_speed);
+        stepperX->move(estimated_steps);
+        runallowed = true;
+        Serial.println("Estimated steps to 90%: " + String(estimated_steps));
+      }
+      if (!stepperX->isRunning() || i >= target_90) {
+        stepperX->stopMove();
+        runallowed = false;
+        timer = millis() + 200;  // Petite stabilisation avant slow
+        step = 41;
       }
       break;
+    }
 
-    case 4: // Dosage lent
-      current_status = "Slow";
-      stepperX.setSpeed(low_speed);
-      if (i >= consigne - 0.01) {
+    case 41: // Stabilisation après fast
+      if (millis() > timer) {
         step = 5;
+        Serial.println("Stabilisation après fast terminée, passage à slow");
       }
       break;
 
-    case 5: // Début stabilisation
+    case 5: // Dosage lent jusqu'à consigne - 0.02 (augmenté pour éviter overshoot)
+      current_status = "Slow";
+      stepperX->setSpeedInHz(low_speed);
+      stepperX->runForward();  // Continu lent
+      runallowed = true;
+      if (i >= consigne - 0.02) {
+        stepperX->stopMove();
+        runallowed = false;
+        step = 6;
+      }
+      break;
+
+    case 6: // Début stabilisation
       current_status = "Stab";
+      stepperX->stopMove();
       runallowed = false;
       timer = millis() + 500;
-      step = 6;
+      step = 7;
       Serial.println("Stabilisation commencee");
       break;
 
-    case 6: // Attente stabilisation
+    case 7: // Attente stabilisation
       if (millis() > timer) {
-        step = 7;
+        step = 8;
         Serial.println("Stabilisation terminee, verification poids");
       }
       break;
 
-    case 7: // Vérification poids
+    case 8: // Vérification poids
       if (i >= consigne - 0.005) {
         step = 0;
         Serial.println("Poids atteint, retour a attente");
       } else {
-        step = 8;
+        step = 9;
         Serial.println("Ajout final necessaire");
       }
       break;
 
-    case 8: // Début dernier ajout
+    case 9: // Début dernier ajout
       current_status = "Drop";
-      stepperX.setSpeed(very_low_speed);
+      stepperX->setSpeedInHz(very_low_speed);
+      stepperX->move(5);  // Réduit à 5 steps pour plus de précision
       runallowed = true;
-      timer = millis() + 20;
-      step = 9;
+      timer = millis() + 500;
+      step = 10;
       break;
 
-    case 9: // Fin dernier ajout
-      if (millis() > timer) {
+    case 10: // Fin dernier ajout
+      if (!stepperX->isRunning() || millis() > timer) {
+        stepperX->stopMove();
         runallowed = false;
-        step = 5;
+        step = 6;  // Retour à stabilisation
         Serial.println("Dernier ajout termine, retour a stabilisation");
+      }
+      break;
+
+    // Calibration standalone (séparée, via long press TARE)
+    case 100: // Tarage pour calib standalone
+      current_status = "Tare Calib";
+      LoadCell.tare();
+      timer = millis() + 2000;
+      step = 101;
+      Serial.println("Tarage pour calibration standalone");
+      break;
+
+    case 101: // Attente fin tarage calib standalone
+      if (LoadCell.getTareStatus() || millis() > timer) {
+        step = 102;
+        Serial.println("Tarage calib termine");
+      }
+      break;
+
+    case 102: // Exécution calibration standalone
+      initial_weight = i;
+      stepperX->setSpeedInHz(max_speed);
+      stepperX->move(calib_steps);
+      runallowed = true;
+      timer = millis() + 5000;
+      step = 103;
+      Serial.println("Calibration standalone started: " + String(calib_steps) + " steps");
+      break;
+
+    case 103: // Attente fin move + stabilisation
+      if (!stepperX->isRunning() || millis() > timer) {
+        runallowed = false;
+        timer = millis() + 500;  // Attente stabilisation
+        step = 104;
+      }
+      break;
+
+    case 104: // Mesure après stabilisation, update et reset
+      if (millis() > timer) {
+        float delta_weight = i - initial_weight;
+        if (delta_weight > 0) {
+          grams_per_step = delta_weight / calib_steps;
+          Serial.print("Calibration standalone done: grams/step = ");
+          Serial.println(grams_per_step, 6);
+        } else {
+          Serial.println("Calibration standalone failed: no weight change, using default");
+        }
+        calibration_done = true;
+        step = 0;  // Reset à attente
+        current_status = "Wait";
+        Serial.println("Calibration terminée, retour à attente");
       }
       break;
   }
@@ -237,14 +358,6 @@ void Process() {
 void loop() {
   filters();
   Process();
-  if (runallowed) {
-    stepperX.runSpeed();  // Appel principal
-    // Appels supplémentaires pour améliorer la fluidité si loop est lente
-    stepperX.runSpeed();
-    stepperX.runSpeed();
-    stepperX.runSpeed();
-    stepperX.runSpeed();
-  }
   Update();
   // Log pour confirmer que la loop tourne, toutes les 5s pour réduire
   if (millis() > lastLoopLog + 5000) {
@@ -259,7 +372,7 @@ void Update() {
     lcd.print("                ");  // Efface la ligne 0
     lcd.setCursor(0, 0);
     String stp_label = auto_mode ? "StpA:" : "Stp:";
-    lcd.print(stp_label + current_status + " Sp:" + String((int)(stepperX.speed() / max_speed * 100)) + "%");
+    lcd.print(stp_label + current_status + " Sp:" + String((int)(stepperX->getCurrentSpeedInMilliHz() / (max_speed * 1000 / 1000) * 100)) + "%");  // Approximation
 
     lcd.setCursor(0, 1);
     lcd.print("                ");  // Efface la ligne 1

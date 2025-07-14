@@ -10,6 +10,7 @@
             "includePath": [
                 "C:/Users/guigu/OpenPowder/OpenPowder-1/include",
                 "C:/Users/guigu/OpenPowder/OpenPowder-1/src",
+                "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/FastAccelStepper/src",
                 "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/LiquidCrystal_I2C",
                 "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/Wire/src",
                 "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/EWMA",
@@ -29,6 +30,7 @@
                 "path": [
                     "C:/Users/guigu/OpenPowder/OpenPowder-1/include",
                     "C:/Users/guigu/OpenPowder/OpenPowder-1/src",
+                    "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/FastAccelStepper/src",
                     "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/LiquidCrystal_I2C",
                     "C:/Users/guigu/.platformio/packages/framework-arduino-sam/libraries/Wire/src",
                     "C:/Users/guigu/OpenPowder/OpenPowder-1/.pio/libdeps/due/EWMA",
