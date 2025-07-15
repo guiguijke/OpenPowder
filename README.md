@@ -40,13 +40,13 @@ Assemble the hardware as per standard Arduino wiring diagrams for these componen
 
 1\. **Clone the Repository**:
 
-   ```bash
+```bash
 
-   git clone https://github.com/yourusername/OpenPowder.git
+git clone https://github.com/yourusername/OpenPowder.git
 
-   cd OpenPowder
+cd OpenPowder
 
-   ```
+```
 
 2\. **Set Up Development Environment**:
 
@@ -60,17 +60,17 @@ Assemble the hardware as per standard Arduino wiring diagrams for these componen
 
      - Configure `platformio.ini` if needed (example below):
 
-       ```ini
+```ini
 
-       [env:due]
+[env:due]
 
-       platform = atmelsam
+platform = atmelsam
 
-       board = due
+board = due
 
-       framework = arduino
+framework = arduino
 
-       ```
+```
 
      - Build and upload: Use the PIO toolbar (bottom of VSCode) to build (`✓` icon) and upload (`→` icon) to your Arduino Due.
 
