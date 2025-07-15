@@ -20,8 +20,10 @@ int step = 0;
 float consigne = 0.0;
 float i = 0.0; // Poids brut
 unsigned long timer = 0;
+float med_speed = max_speed / 3;
 float low_speed = max_speed / 10;
 float very_low_speed = max_speed / 20;
+float ultra_low_speed = max_speed / 30;
 
 const int buttonPin = 9;   // Départ cycle
 const int buttonPin1 = 10; // TARE
@@ -50,6 +52,13 @@ boolean buttonActive = false;
 boolean longPressActive = false;
 unsigned long buttonTimer = 0;
 const unsigned long longPressTime = 1000; // 1 seconde pour long press
+
+// Pour affichage optimisé
+static String last_current_status = "";
+static bool last_auto_mode = false;
+static int last_speed_pc = -1;
+static float last_consigne = -1.0;
+static float last_i = -1.0;
 
 void setup() {
   Serial.begin(115200);
@@ -95,6 +104,10 @@ void setup() {
   lcd.setCursor(0, 0);
   lcd.print("Setup Done");
   Serial.println("LCD cleared and Setup Done displayed");
+
+  // Initialiser affichage fixe
+  lcd.setCursor(0, 1);
+  lcd.print("T:      W:      ");
 
   engine = FastAccelStepperEngine();
   engine.init();
@@ -195,6 +208,11 @@ void Process() {
     lastProcessLog = millis();
   }
 
+  float fast_pct = min(0.95f, max(0.80f, 0.80f + (consigne / 3.0f) * 0.15f));
+  float med_pct = 0.97f;
+  float slow_pct = 0.995f;
+  float tolerance = 0.005f;
+
   switch (step) {
     case 0: // Attente
       current_status = "Wait" + String(auto_mode ? "A" : "");
@@ -219,21 +237,27 @@ void Process() {
       }
       break;
 
-    case 4: { // Dosage rapide estimé jusqu'à 90% (réduit pour éviter overshoot)
+    case 4: { // Dosage rapide estimé jusqu'à fast_pct
       current_status = "Fast";
-      float target_90 = consigne * 0.90;
-      float remaining_grams = target_90 - i;
+      float target_fast = consigne * fast_pct;
+      float remaining_grams = target_fast - i;
       long estimated_steps = (long)(remaining_grams / grams_per_step);
-      if (estimated_steps > 0) {
-        stepperX->setSpeedInHz(max_speed);
-        stepperX->move(estimated_steps);
-        runallowed = true;
-        Serial.println("Estimated steps to 90%: " + String(estimated_steps));
-      }
-      if (!stepperX->isRunning() || i >= target_90) {
+      long fast_speed = (consigne < 0.5) ? max_speed / 2 : max_speed;
+      if (i >= target_fast) {
         stepperX->stopMove();
         runallowed = false;
-        timer = millis() + 200;  // Petite stabilisation avant slow
+        timer = millis() + 500;
+        step = 41;
+      } else if (estimated_steps > 0) {
+        stepperX->setSpeedInHz(fast_speed);
+        stepperX->move(estimated_steps);
+        runallowed = true;
+        Serial.println("Estimated steps to fast_pct: " + String(estimated_steps));
+      }
+      if (!stepperX->isRunning() || i >= target_fast) {
+        stepperX->stopMove();
+        runallowed = false;
+        timer = millis() + 500;  // Stabilisation plus longue
         step = 41;
       }
       break;
@@ -241,64 +265,120 @@ void Process() {
 
     case 41: // Stabilisation après fast
       if (millis() > timer) {
-        step = 5;
-        Serial.println("Stabilisation après fast terminée, passage à slow");
+        step = 50;
+        Serial.println("Stabilisation après fast terminée, passage à med slow");
       }
       break;
 
-    case 5: // Dosage lent jusqu'à consigne - 0.02 (augmenté pour éviter overshoot)
-      current_status = "Slow";
-      stepperX->setSpeedInHz(low_speed);
-      stepperX->runForward();  // Continu lent
+    case 50: { // Med slow burst
+      current_status = "MedSlw";
+      if (i >= consigne * med_pct) {
+        step = 60;
+        break;
+      }
+      float remaining = consigne * med_pct - i;
+      if (remaining <= 0) {
+        step = 60;
+        break;
+      }
+      long burst_steps = (long)(remaining / grams_per_step * 0.8);
+      burst_steps = max(5L, min(20L, burst_steps));
+      stepperX->setSpeedInHz(med_speed);
+      stepperX->move(burst_steps);
       runallowed = true;
-      if (i >= consigne - 0.02) {
-        stepperX->stopMove();
-        runallowed = false;
-        step = 6;
-      }
+      step = 51;
       break;
+    }
 
-    case 6: // Début stabilisation
-      current_status = "Stab";
-      stepperX->stopMove();
+    case 51: // Wait after med burst
+      current_status = "MedSlw";
+      if (stepperX->isRunning()) {
+        break;
+      }
       runallowed = false;
-      timer = millis() + 500;
-      step = 7;
-      Serial.println("Stabilisation commencee");
+      timer = millis() + 300;
+      step = 52;
       break;
 
-    case 7: // Attente stabilisation
+    case 52: // Stab after med
+      current_status = "MedSlw";
       if (millis() > timer) {
-        step = 8;
-        Serial.println("Stabilisation terminee, verification poids");
+        step = 50;
       }
       break;
 
-    case 8: // Vérification poids
-      if (i >= consigne - 0.005) {
+    case 60: { // Slow burst
+      current_status = "Slow";
+      if (i >= consigne * slow_pct) {
+        step = 70;
+        break;
+      }
+      float remaining_slow = consigne * slow_pct - i;
+      if (remaining_slow <= 0) {
+        step = 70;
+        break;
+      }
+      long burst_steps_slow = (long)(remaining_slow / grams_per_step * 0.8);
+      burst_steps_slow = max(3L, min(10L, burst_steps_slow));
+      stepperX->setSpeedInHz(low_speed);
+      stepperX->move(burst_steps_slow);
+      runallowed = true;
+      step = 61;
+      break;
+    }
+
+    case 61: // Wait after slow burst
+      current_status = "Slow";
+      if (stepperX->isRunning()) {
+        break;
+      }
+      runallowed = false;
+      timer = millis() + 400;
+      step = 62;
+      break;
+
+    case 62: // Stab after slow
+      current_status = "Slow";
+      if (millis() > timer) {
+        step = 60;
+      }
+      break;
+
+    case 70: { // Very slow burst
+      current_status = "VSlow";
+      if (i >= consigne - tolerance) {
         step = 0;
         Serial.println("Poids atteint, retour a attente");
-      } else {
-        step = 9;
-        Serial.println("Ajout final necessaire");
+        break;
       }
-      break;
-
-    case 9: // Début dernier ajout
-      current_status = "Drop";
+      float remaining_vslow = consigne - tolerance - i;
+      if (remaining_vslow <= 0) {
+        step = 0;
+        break;
+      }
+      long burst_steps_vslow = (long)(remaining_vslow / grams_per_step * 0.8);
+      burst_steps_vslow = max(1L, min(5L, burst_steps_vslow));
       stepperX->setSpeedInHz(very_low_speed);
-      stepperX->move(5);  // Réduit à 5 steps pour plus de précision
+      stepperX->move(burst_steps_vslow);
       runallowed = true;
+      step = 71;
+      break;
+    }
+
+    case 71: // Wait after vslow burst
+      current_status = "VSlow";
+      if (stepperX->isRunning()) {
+        break;
+      }
+      runallowed = false;
       timer = millis() + 500;
-      step = 10;
+      step = 72;
       break;
 
-    case 10: // Fin dernier ajout
-      if (!stepperX->isRunning() || millis() > timer) {
-        stepperX->stopMove();
-        runallowed = false;
-        step = 6;  // Retour à stabilisation
-        Serial.println("Dernier ajout termine, retour a stabilisation");
+    case 72: // Stab after vslow
+      current_status = "VSlow";
+      if (millis() > timer) {
+        step = 70;
       }
       break;
 
@@ -368,16 +448,45 @@ void loop() {
 
 void Update() {
   if (millis() > z + 200) {
-    lcd.setCursor(0, 0);
-    lcd.print("                ");  // Efface la ligne 0
-    lcd.setCursor(0, 0);
     String stp_label = auto_mode ? "StpA:" : "Stp:";
-    lcd.print(stp_label + current_status + " Sp:" + String((int)(stepperX->getCurrentSpeedInMilliHz() / (max_speed * 1000 / 1000) * 100)) + "%");  // Approximation
+    String status_full = stp_label + current_status;
+    while (status_full.length() < 10) status_full += " ";
+    if (status_full.length() > 10) status_full = status_full.substring(0, 10);
 
-    lcd.setCursor(0, 1);
-    lcd.print("                ");  // Efface la ligne 1
-    lcd.setCursor(0, 1);
-    lcd.print("T:" + String(consigne, 3) + " W:" + String(i, 3));
+    int speed_pc = (int)(stepperX->getCurrentSpeedInMilliHz() / 1000.0 / max_speed * 100.0);
+
+    // Mise à jour status si changé
+    if (current_status != last_current_status || auto_mode != last_auto_mode) {
+      lcd.setCursor(0, 0);
+      lcd.print(status_full);
+      last_current_status = current_status;
+      last_auto_mode = auto_mode;
+    }
+
+    // Mise à jour speed %
+    if (speed_pc != last_speed_pc) {
+      lcd.setCursor(11, 0);
+      lcd.print("Sp:");
+      lcd.print(speed_pc);
+      lcd.print("% ");
+      last_speed_pc = speed_pc;
+    }
+
+    // Mise à jour consigne
+    if (abs(consigne - last_consigne) > 0.001) {
+      lcd.setCursor(2, 1);
+      lcd.print(String(consigne, 3));
+      lcd.print(" ");
+      last_consigne = consigne;
+    }
+
+    // Mise à jour poids
+    if (abs(i - last_i) > 0.001) {
+      lcd.setCursor(10, 1);
+      lcd.print(String(i, 3));
+      lcd.print(" ");
+      last_i = i;
+    }
 
     // Log pour affichage, toutes les 1s au lieu de 200ms
     static unsigned long lastUpdateLog = 0;
