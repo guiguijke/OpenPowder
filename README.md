@@ -1,7 +1,5 @@
 # OpenPowder
 
-![OpenPowder Logo](https://via.placeholder.com/150?text=OpenPowder) <!-- Replace with actual logo if available -->
-
 Welcome to **OpenPowder** -- an open-source project for precise and efficient powder dosing using Arduino! Whether you're in pharmaceuticals, chemistry, or DIY crafting, OpenPowder automates the dispensing of fine powders with high accuracy and speed. Say goodbye to manual scoops and hello to reliable, repeatable dosing.
 
 This project leverages a stepper motor for controlled dispensing, a high-precision load cell for real-time weight monitoring, and an intuitive LCD interface. It's designed to handle small quantities (up to 3g) with minimal overshoot, making it ideal for sensitive applications.
