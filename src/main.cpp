@@ -62,6 +62,19 @@ static int last_speed_pc = -1;
 static float last_setpoint = -1.0;
 static float last_current_weight = -1.0;
 
+// Rotary encoder
+const int encoderClk = 3;
+const int encoderDt = 5;
+const int encoderSw = 7;
+int last_clk;
+unsigned long last_sw_press = 0;
+unsigned long last_encoder_time = 0;
+const unsigned long button_debounce = 50; // ms for button
+const unsigned long encoder_debounce = 20; // Increased for better debouncing
+int edit_digit = -1;
+int digits[4] = {0, 0, 0, 0}; // units, tenths, hundredths, thousandths
+unsigned long validation_time = 0; // For displaying "Valid"
+
 void setup() {
   Serial.begin(115200);
   Serial.println("Setup started");
@@ -69,6 +82,12 @@ void setup() {
   pinMode(buttonPin, INPUT);
   pinMode(buttonPin1, INPUT);
   pinMode(modeautopin, INPUT);
+
+  pinMode(encoderClk, INPUT);
+  pinMode(encoderDt, INPUT);
+  pinMode(encoderSw, INPUT_PULLUP); // Active low
+
+  last_clk = digitalRead(encoderClk);
 
   lcd.init();
   lcd.backlight();
@@ -141,10 +160,6 @@ void dataReadyISR() {
 }
 
 void filters() {
-  // No Ewma filtering for the setpoint, use raw
-  float a0 = analogRead(A0);
-  float a1 = analogRead(A1);
-
   if (newDataReady) {
     if (millis() > t) {
       float loadcelldata = LoadCell.getData();
@@ -158,10 +173,6 @@ void filters() {
       }
     }
   }
-
-  float integer_part_raw_setpoint = map(a0, 4, 1020, 30, 0) / 10.0;
-  float decimal_part_raw_setpoint = map(a1, 4, 1020, 100, 0) / 1000.0;
-  setpoint = integer_part_raw_setpoint + decimal_part_raw_setpoint;
 
   auto_mode = digitalRead(modeautopin);
   buttonState1 = digitalRead(buttonPin1);
@@ -199,6 +210,50 @@ void filters() {
   }
 
   lastReading = buttonState1;
+
+  // Encoder button (SW)
+  bool sw_state = digitalRead(encoderSw);
+  if (sw_state == LOW && millis() - last_sw_press > button_debounce) {
+    last_sw_press = millis();
+    if (edit_digit == -1) {
+      // Enter edit mode, initialize digits from current setpoint
+      int sp_int = (int)(setpoint * 1000 + 0.5);
+      digits[3] = sp_int % 10; // thousandths
+      sp_int /= 10;
+      digits[2] = sp_int % 10; // hundredths
+      sp_int /= 10;
+      digits[1] = sp_int % 10; // tenths
+      sp_int /= 10;
+      digits[0] = sp_int % 10; // units
+      edit_digit = 0; // Start with units
+    } else {
+      edit_digit++;
+      if (edit_digit > 3) {
+        edit_digit = -1;
+        validation_time = millis() + 1000; // Show "Valid" for 1s
+        // Setpoint already updated
+      }
+    }
+  }
+
+  // Encoder rotation - improved to trigger only on falling edge of CLK
+  int current_clk = digitalRead(encoderClk);
+  if (last_clk == HIGH && current_clk == LOW && millis() - last_encoder_time > encoder_debounce) { // Falling edge
+    if (edit_digit >= 0) {
+      int dt_state = digitalRead(encoderDt);
+      if (dt_state == LOW) {
+        // CW: increase
+        if (digits[edit_digit] < 9) digits[edit_digit]++;
+      } else {
+        // CCW: decrease
+        if (digits[edit_digit] > 0) digits[edit_digit]--;
+      }
+      // Update setpoint immediately for display
+      setpoint = digits[0] + digits[1] / 10.0 + digits[2] / 100.0 + digits[3] / 1000.0;
+      last_encoder_time = millis();
+    }
+  }
+  last_clk = current_clk;
 }
 
 void Process() {
@@ -218,7 +273,7 @@ void Process() {
   switch (state) {
     case 0: // Waiting
       current_status = "Wait" + String(auto_mode ? "A" : "");
-      if ((digitalRead(buttonPin) == HIGH) || (auto_mode && current_weight > -0.5)) {
+      if (((digitalRead(buttonPin) == HIGH) || (auto_mode && current_weight > -0.5)) && edit_digit == -1) {
         state = 1;
         Serial.println("Process starting");
       }
@@ -470,7 +525,7 @@ void Update() {
     String stp_label = auto_mode ? "StpA:" : "Stp:";
     String status_full = stp_label + current_status;
     while (status_full.length() < 10) status_full += " ";
-    if (status_full.length() > 10) status_full = status_full.substring(0, 10);
+    if (status_full.length() > 10) status_full = status_full.substring(0,10);
 
     static bool flash_on = false;
     flash_on = !flash_on;  // Toggle every 200ms
@@ -482,11 +537,16 @@ void Update() {
       }
     }
 
+    // Override with "Valid" if in validation period
+    if (millis() < validation_time) {
+      status_full = "Valid      ";
+    }
+
     int speed_pc = (int)(stepperX->getCurrentSpeedInMilliHz() / 1000.0 / max_speed * 100.0);
     speed_pc = min(99, max(0, speed_pc));
 
     // Update status if changed or flashing
-    if (current_status != last_current_status || auto_mode != last_auto_mode || show_calib_message) {
+    if (current_status != last_current_status || auto_mode != last_auto_mode || show_calib_message || millis() < validation_time) {
       lcd.setCursor(0, 0);
       lcd.print(status_full);
       last_current_status = current_status;
@@ -502,11 +562,26 @@ void Update() {
       last_speed_pc = speed_pc;
     }
 
-    // Update setpoint
-    if (abs(setpoint - last_setpoint) > 0.001) {
+    // Update setpoint (force if editing for blink)
+    if (abs(setpoint - last_setpoint) > 0.001 || edit_digit >= 0) {
       lcd.setCursor(2, 1);
-      lcd.print(String(setpoint, 3));
-      lcd.print(" ");
+      if (edit_digit >= 0) {
+        // Build the string
+        String sp_str = String(digits[0]) + "." + String(digits[1]) + String(digits[2]) + String(digits[3]);
+        if (!flash_on) {
+          int char_pos;
+          if (edit_digit == 0) char_pos = 0; // units
+          else if (edit_digit == 1) char_pos = 2; // tenths
+          else if (edit_digit == 2) char_pos = 3; // hundredths
+          else char_pos = 4; // thousandths
+          sp_str.setCharAt(char_pos, ' ');
+        }
+        lcd.print(sp_str);
+        lcd.print(" ");
+      } else {
+        lcd.print(String(setpoint, 3));
+        lcd.print(" ");
+      }
       last_setpoint = setpoint;
     }
 
